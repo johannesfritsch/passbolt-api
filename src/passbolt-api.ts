@@ -7,20 +7,80 @@ import { Resource } from './types/resource';
 import { ResourceType } from './types/resource-type';
 import { User } from './types/user';
 
+interface UserAuth {
+  fingerprint: string;
+  privateKeyArmored: string;
+  publicKeyArmored: string;
+  privateKeyPassphrase: string;
+}
+
+interface PassboltResource {
+  name: string;
+  username?: string;
+  description?: string;
+  uri?: string;
+  plainPassword?: string;
+  secretMessage(): string;
+  serialize(): Record<string, string | undefined>;
+}
+
+export class PassboltPassword implements PassboltResource {
+  constructor(
+    public name: string,
+    public plainPassword: string,
+    public username?: string,
+    public description?: string,
+    public uri?: string,
+  ) {}
+
+  secretMessage(): string {
+    return this.plainPassword;
+  }
+
+  serialize() {
+    return { name: this.name, username: this.username, description: this.description, uri: this.uri };
+  }
+}
+
+export class PassboltSecureNote implements PassboltResource {
+  constructor(
+    public name: string,
+    public description: string,
+    public plainPassword?: string,
+    public username?: string,
+    public uri?: string,
+  ) {}
+
+  secretMessage(): string {
+    return JSON.stringify({ password: this.plainPassword || 'no-password', description: this.description });
+  }
+
+  serialize() {
+    return { name: this.name, username: this.username, uri: this.uri };
+  }
+}
+
 export class PassboltApi {
+  private baseUrl: string;
   private token: string;
+  private userAuth: UserAuth;
+  private resourceTypeIds: { simplePassword: string; withDescription: string };
   private cookieJar = new CookieJar();
 
-  constructor(
-    private baseUrl: string,
-    private userAuth: {
-      fingerprint: string;
-      privateKeyArmored: string;
-      publicKeyArmored: string;
-      privateKeyPassphrase: string;
-    },
-  ) {
-    this.token = `gpgauthv1.3.0|36|${uuid()}|gpgauthv1.3.0`;
+  private constructor() {
+    this.baseUrl = '';
+    this.token = '';
+    this.resourceTypeIds = { simplePassword: '', withDescription: '' };
+    this.userAuth = { fingerprint: '', privateKeyArmored: '', publicKeyArmored: '', privateKeyPassphrase: '' };
+  }
+
+  public static async init(baseUrl: string, userAuth: UserAuth) {
+    const instance = new PassboltApi();
+    instance.baseUrl = baseUrl;
+    instance.userAuth = userAuth;
+    instance.token = `gpgauthv1.3.0|36|${uuid()}|gpgauthv1.3.0`;
+    instance.resourceTypeIds = await instance.fetchResourceTypeIds();
+    return instance;
   }
 
   private async request(
@@ -107,54 +167,29 @@ export class PassboltApi {
     return body.body;
   }
 
-  public async getResourceTypeIds() {
+  private async fetchResourceTypeIds() {
     const resourceTypes = await this.listResourceTypes();
     const passwordType = resourceTypes.find((type) => type.slug === 'password-string');
     if (!passwordType) throw new Error('No resource type with slug password-string found');
     const withDescriptionType = resourceTypes.find((type) => type.slug === 'password-and-description');
     if (!withDescriptionType) throw new Error('No resource type with slug password-and-description found');
-    return { password: passwordType.id, withDescription: withDescriptionType.id };
+    return { simplePassword: passwordType.id, withDescription: withDescriptionType.id };
   }
 
-  public async createPassword(data: {
-    name: string;
-    resourceTypeId: string;
-    plainPassword: string;
-    username?: string;
-    description?: string;
-    uri?: string;
-  }): Promise<Resource> {
+  private getResourceTypeId(resource: PassboltResource) {
+    if (resource instanceof PassboltPassword) return this.resourceTypeIds.simplePassword;
+    if (resource instanceof PassboltSecureNote) return this.resourceTypeIds.withDescription;
+  }
+
+  public async createResource(resource: PassboltResource): Promise<Resource> {
     const encrypted = await pgp.encrypt({
-      message: await pgp.createMessage({ text: data.plainPassword }),
+      message: await pgp.createMessage({ text: resource.secretMessage() }),
       encryptionKeys: await pgp.readKey({ armoredKey: this.userAuth.publicKeyArmored }),
     });
 
     const { body } = await this.request('/resources.json', 'POST', {
-      ...data,
-      resource_type_id: data.resourceTypeId,
-      secrets: [{ data: encrypted }],
-    });
-    return body.body;
-  }
-
-  public async createSecureNote(data: {
-    name: string;
-    resourceTypeId: string;
-    username?: string;
-    plainPassword?: string;
-    description: string;
-    uri?: string;
-  }): Promise<Resource> {
-    const encrypted = await pgp.encrypt({
-      message: await pgp.createMessage({
-        text: JSON.stringify({ password: data.plainPassword || 'no-password', description: data.description }),
-      }),
-      encryptionKeys: await pgp.readKey({ armoredKey: this.userAuth.publicKeyArmored }),
-    });
-
-    const { body } = await this.request('/resources.json', 'POST', {
-      ...data,
-      resource_type_id: data.resourceTypeId,
+      ...resource.serialize(),
+      resource_type_id: this.getResourceTypeId(resource),
       secrets: [{ data: encrypted }],
     });
     return body.body;
@@ -173,7 +208,7 @@ export class PassboltApi {
     return body.body;
   }
 
-  public async shareWithGroup(resourceId: string, plainPassword: string, groupId: string) {
+  public async shareWithGroup(resourceId: string, resource: PassboltResource, groupId: string) {
     const members = (await this.listUsers(groupId)).filter((user) => user.gpgkey);
 
     await this.request(`/share/resource/${resourceId}.json`, 'PUT', {
@@ -190,7 +225,7 @@ export class PassboltApi {
         members.map(async (user) => ({
           user_id: user.id,
           data: await pgp.encrypt({
-            message: await pgp.createMessage({ text: plainPassword }),
+            message: await pgp.createMessage({ text: resource.secretMessage() }),
             encryptionKeys: await pgp.readKey({ armoredKey: user.gpgkey!.armored_key }),
           }),
         })),
