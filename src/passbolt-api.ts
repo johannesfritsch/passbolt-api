@@ -79,7 +79,6 @@ export class PassboltApi {
     instance.baseUrl = baseUrl;
     instance.userAuth = userAuth;
     instance.token = `gpgauthv1.3.0|36|${uuid()}|gpgauthv1.3.0`;
-    instance.resourceTypeIds = await instance.fetchResourceTypeIds();
     return instance;
   }
 
@@ -167,13 +166,13 @@ export class PassboltApi {
     return body.body;
   }
 
-  private async fetchResourceTypeIds() {
+  public async fetchResourceTypeIds() {
     const resourceTypes = await this.listResourceTypes();
     const passwordType = resourceTypes.find((type) => type.slug === 'password-string');
     if (!passwordType) throw new Error('No resource type with slug password-string found');
     const withDescriptionType = resourceTypes.find((type) => type.slug === 'password-and-description');
     if (!withDescriptionType) throw new Error('No resource type with slug password-and-description found');
-    return { simplePassword: passwordType.id, withDescription: withDescriptionType.id };
+    this.resourceTypeIds = { simplePassword: passwordType.id, withDescription: withDescriptionType.id };
   }
 
   private getResourceTypeId(resource: PassboltResource) {
