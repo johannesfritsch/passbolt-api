@@ -107,17 +107,16 @@ export class PassboltApi {
     return body.body;
   }
 
-  public async getPasswordResourceTypeId(): Promise<string> {
+  public async getResourceTypeIds() {
     const resourceTypes = await this.listResourceTypes();
     const passwordType = resourceTypes.find((type) => type.slug === 'password-string');
     if (!passwordType) throw new Error('No resource type with slug password-string found');
-    return passwordType.id;
+    const withDescriptionType = resourceTypes.find((type) => type.slug === 'password-and-description');
+    if (!withDescriptionType) throw new Error('No resource type with slug password-and-description found');
+    return { password: passwordType.id, withDescription: withDescriptionType.id };
   }
 
-  public async createPassword({
-    plainPassword,
-    ...data
-  }: {
+  public async createPassword(data: {
     name: string;
     resourceTypeId: string;
     plainPassword: string;
@@ -126,11 +125,38 @@ export class PassboltApi {
     uri?: string;
   }): Promise<Resource> {
     const encrypted = await pgp.encrypt({
-      message: await pgp.createMessage({ text: plainPassword }),
+      message: await pgp.createMessage({ text: data.plainPassword }),
       encryptionKeys: await pgp.readKey({ armoredKey: this.userAuth.publicKeyArmored }),
     });
 
-    const { body } = await this.request('/resources.json', 'POST', { ...data, secrets: [{ data: encrypted }] });
+    const { body } = await this.request('/resources.json', 'POST', {
+      ...data,
+      resource_type_id: data.resourceTypeId,
+      secrets: [{ data: encrypted }],
+    });
+    return body.body;
+  }
+
+  public async createSecureNote(data: {
+    name: string;
+    resourceTypeId: string;
+    username?: string;
+    plainPassword?: string;
+    description: string;
+    uri?: string;
+  }): Promise<Resource> {
+    const encrypted = await pgp.encrypt({
+      message: await pgp.createMessage({
+        text: JSON.stringify({ password: data.plainPassword || 'no-password', description: data.description }),
+      }),
+      encryptionKeys: await pgp.readKey({ armoredKey: this.userAuth.publicKeyArmored }),
+    });
+
+    const { body } = await this.request('/resources.json', 'POST', {
+      ...data,
+      resource_type_id: data.resourceTypeId,
+      secrets: [{ data: encrypted }],
+    });
     return body.body;
   }
 
