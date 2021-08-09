@@ -61,25 +61,12 @@ export class PassboltSecureNote implements PassboltResource {
 }
 
 export class PassboltApi {
-  private baseUrl: string;
   private token: string;
-  private userAuth: UserAuth;
-  private resourceTypeIds: { simplePassword: string; withDescription: string };
+  private resourceTypeIds: { simplePassword: string; withDescription: string } | undefined;
   private cookieJar = new CookieJar();
 
-  private constructor() {
-    this.baseUrl = '';
-    this.token = '';
-    this.resourceTypeIds = { simplePassword: '', withDescription: '' };
-    this.userAuth = { fingerprint: '', privateKeyArmored: '', publicKeyArmored: '', privateKeyPassphrase: '' };
-  }
-
-  public static async init(baseUrl: string, userAuth: UserAuth) {
-    const instance = new PassboltApi();
-    instance.baseUrl = baseUrl;
-    instance.userAuth = userAuth;
-    instance.token = `gpgauthv1.3.0|36|${uuid()}|gpgauthv1.3.0`;
-    return instance;
+  constructor(private baseUrl: string, private userAuth: UserAuth) {
+    this.token = `gpgauthv1.3.0|36|${uuid()}|gpgauthv1.3.0`;
   }
 
   private async request(
@@ -175,9 +162,10 @@ export class PassboltApi {
     this.resourceTypeIds = { simplePassword: passwordType.id, withDescription: withDescriptionType.id };
   }
 
-  private getResourceTypeId(resource: PassboltResource) {
-    if (resource instanceof PassboltPassword) return this.resourceTypeIds.simplePassword;
-    if (resource instanceof PassboltSecureNote) return this.resourceTypeIds.withDescription;
+  private async getResourceTypeId(resource: PassboltResource) {
+    if (!this.resourceTypeIds) await this.fetchResourceTypeIds();
+    if (resource instanceof PassboltPassword) return this.resourceTypeIds!.simplePassword;
+    if (resource instanceof PassboltSecureNote) return this.resourceTypeIds!.withDescription;
   }
 
   public async createResource(resource: PassboltResource): Promise<Resource> {
@@ -188,7 +176,7 @@ export class PassboltApi {
 
     const { body } = await this.request('/resources.json', 'POST', {
       ...resource.serialize(),
-      resource_type_id: this.getResourceTypeId(resource),
+      resource_type_id: await this.getResourceTypeId(resource),
       secrets: [{ data: encrypted }],
     });
     return body.body;
