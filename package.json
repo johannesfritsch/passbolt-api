@@ -1,16 +1,29 @@
 {
-  "name": "passbolt-api",
-  "version": "1.0.0",
-  "main": "index.js",
-  "license": "MIT",
-  "devDependencies": {
-    "@types/node-fetch": "^2.5.11",
-    "@types/tough-cookie": "^4.0.1",
-    "@types/uuid": "^8.3.1",
-    "typescript": "^4.3.5"
+  "name": "@liquiditeam/passbolt-api",
+  "version": "0.0.2",
+  "publishConfig": {
+    "access": "public"
   },
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
-    "build": "rm -rf build && tsc"
+    "build": "rm -rf build && tsc",
+    "prepublish": "yarn build"
+  },
+  "contributors": [
+    {
+      "name": "Niklas Mack",
+      "email": "niklas@liquidi.team"
+    },
+    {
+      "name": "Johannes Fritsch",
+      "email": "johannes@liquidi.team"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/johannesfritsch/passbolt-api.git"
   },
   "dependencies": {
     "dotenv": "^10.0.0",
@@ -18,5 +31,11 @@
     "openpgp": "^5.0.0-4",
     "tough-cookie": "^4.0.0",
     "uuid": "^8.3.2"
+  },
+  "devDependencies": {
+    "@types/node-fetch": "^2.5.11",
+    "@types/tough-cookie": "^4.0.1",
+    "@types/uuid": "^8.3.1",
+    "typescript": "^4.3.5"
   }
 }
