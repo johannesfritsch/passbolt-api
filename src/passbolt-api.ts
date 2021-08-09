@@ -139,14 +139,16 @@ export class PassboltApi {
     return body.body;
   }
 
-  public async listUsers(): Promise<User[]> {
-    const { body } = await this.request('/users.json?api-version=v2', 'GET');
+  public async listUsers(inGroup?: string): Promise<User[]> {
+    const { body } = await this.request(
+      `/users.json?api-version=v2${inGroup ? `&filter[has-groups]=${inGroup}` : ''}`,
+      'GET',
+    );
     return body.body;
   }
 
-  public async shareWithGroup(resourceId: string, plainPassword: string, groupId: string, groupMembers: string[]) {
-    const allUsers = await this.listUsers();
-    const members = allUsers.filter((user) => groupMembers.includes(user.id) && user.gpgkey);
+  public async shareWithGroup(resourceId: string, plainPassword: string, groupId: string) {
+    const members = (await this.listUsers(groupId)).filter((user) => user.gpgkey);
 
     await this.request(`/share/resource/${resourceId}.json`, 'PUT', {
       permissions: [
@@ -159,17 +161,13 @@ export class PassboltApi {
         },
       ],
       secrets: await Promise.all(
-        members.map(async (user) => {
-          console.log(user.gpgkey!.armored_key);
-
-          return {
-            user_id: user.id,
-            data: await pgp.encrypt({
-              message: await pgp.createMessage({ text: plainPassword }),
-              encryptionKeys: await pgp.readKey({ armoredKey: user.gpgkey!.armored_key }),
-            }),
-          };
-        }),
+        members.map(async (user) => ({
+          user_id: user.id,
+          data: await pgp.encrypt({
+            message: await pgp.createMessage({ text: plainPassword }),
+            encryptionKeys: await pgp.readKey({ armoredKey: user.gpgkey!.armored_key }),
+          }),
+        })),
       ),
     });
   }
