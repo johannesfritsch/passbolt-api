@@ -200,6 +200,11 @@ export class PassboltApi {
     return body.body;
   }
 
+  public async findGroup(groupId: string) {
+    const { body } = await this.request(`/groups/${groupId}.json`, 'GET');
+    return body.body;
+  }
+
   public async listUsers(inGroup?: string): Promise<User[]> {
     const { body } = await this.request(
       `/users.json?api-version=v2${inGroup ? `&filter[has-groups]=${inGroup}` : ''}`,
