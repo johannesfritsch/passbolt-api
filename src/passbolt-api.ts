@@ -190,6 +190,11 @@ export class PassboltApi {
     return body.body;
   }
 
+  public async listGroups(): Promise<Group[]> {
+    const { body } = await this.request(`/groups.json`, 'GET');
+    return body.body;
+  }
+
   public async createGroup(name: string, users: { user_id: string; is_admin?: boolean }[]): Promise<Group> {
     const { body } = await this.request('/groups.json', 'POST', { name, groups_users: users });
     return body.body;
