@@ -5,6 +5,7 @@ import { v4 as uuid } from 'uuid';
 import { Group } from './types/group';
 import { Resource } from './types/resource';
 import { ResourceType } from './types/resource-type';
+import { Settings } from './types/settings';
 import { User } from './types/user';
 
 interface UserAuth {
@@ -235,5 +236,10 @@ export class PassboltApi {
         })),
       ),
     });
+  }
+
+  public async getSettings(): Promise<Settings> {
+    const { body } = await this.request('/settings.json?api-version=v2', 'GET');
+    return body.body;
   }
 }
