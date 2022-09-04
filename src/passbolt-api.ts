@@ -207,6 +207,11 @@ export class PassboltApi {
     return body.body;
   }
 
+  public async findUser(userId: string): Promise<User> {
+    const { body } = await this.request(`/users/${userId}.json?api-version=v2`, 'GET');
+    return body.body;
+  }
+
   public async shareWithGroup(resourceId: string, resource: PassboltResource, groupId: string) {
     const members = (await this.listUsers(groupId)).filter((user) => user.gpgkey);
 
