@@ -24,6 +24,13 @@ interface PassboltResource {
   serialize(): Record<string, string | undefined>;
 }
 
+interface createUserPayload {
+  first_name: string;
+  last_name: string;
+  username: string;
+  is_admin: boolean;
+}
+
 export class PassboltPassword implements PassboltResource {
   constructor(
     public name: string,
@@ -31,7 +38,7 @@ export class PassboltPassword implements PassboltResource {
     public username?: string,
     public description?: string,
     public uri?: string,
-  ) {}
+  ) { }
 
   secretMessage(): string {
     return this.plainPassword;
@@ -49,7 +56,7 @@ export class PassboltSecureNote implements PassboltResource {
     public plainPassword?: string,
     public username?: string,
     public uri?: string,
-  ) {}
+  ) { }
 
   secretMessage(): string {
     return JSON.stringify({ password: this.plainPassword || 'no-password', description: this.description });
@@ -192,6 +199,11 @@ export class PassboltApi {
       `/users.json?api-version=v2${inGroup ? `&filter[has-groups]=${inGroup}` : ''}`,
       'GET',
     );
+    return body.body;
+  }
+
+  public async createUser(user: createUserPayload): Promise<User> {
+    const { body } = await this.request('/users.json?api-version=v2', 'POST', user);
     return body.body;
   }
 
