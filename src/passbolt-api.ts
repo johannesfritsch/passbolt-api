@@ -25,11 +25,19 @@ interface PassboltResource {
   serialize(): Record<string, string | undefined>;
 }
 
-interface createUserPayload {
+interface CreateUserPayload {
   first_name: string;
   last_name: string;
   username: string;
   is_admin: boolean;
+}
+
+interface CreateGroupPayload {
+  name: string;
+  users: [{
+    user_id: string;
+    is_admin?: boolean
+  }]
 }
 
 export class PassboltPassword implements PassboltResource {
@@ -195,8 +203,12 @@ export class PassboltApi {
     return body.body;
   }
 
-  public async createGroup(name: string, users: { user_id: string; is_admin?: boolean }[]): Promise<Group> {
-    const { body } = await this.request('/groups.json', 'POST', { name, groups_users: users });
+  public async createGroup(group: CreateGroupPayload): Promise<Group> {
+    const { body } = await this.request('/groups.json', 'POST', {
+      name: group.name,
+      groups_users: group.users
+    });
+
     return body.body;
   }
 
@@ -213,7 +225,7 @@ export class PassboltApi {
     return body.body;
   }
 
-  public async createUser(user: createUserPayload): Promise<User> {
+  public async createUser(user: CreateUserPayload): Promise<User> {
     const { body } = await this.request('/users.json?api-version=v2', 'POST', user);
     return body.body;
   }
