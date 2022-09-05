@@ -1,6 +1,6 @@
 {
-  "name": "@liquiditeam/passbolt-sdk",
-  "version": "0.0.2",
+  "name": "@timobehrendt/passbolt-api",
+  "version": "0.1.0",
   "publishConfig": {
     "access": "public"
   },
@@ -19,11 +19,15 @@
     {
       "name": "Johannes Fritsch",
       "email": "johannes@liquidi.team"
+    },
+    {
+      "name": "Timo Behrendt",
+      "email": "t.behrendt@t00n.de"
     }
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/johannesfritsch/passbolt-api.git"
+    "url": "https://github.com/TechLabs-Global/passbolt-api.git"
   },
   "dependencies": {
     "dotenv": "^10.0.0",
