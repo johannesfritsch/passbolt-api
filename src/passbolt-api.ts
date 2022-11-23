@@ -99,14 +99,14 @@ export class PassboltApi {
     }
   }
 
-  private storeCookies(headers: Headers) {
-    const cookies = headers.raw()['set-cookie'].map((c) => Cookie.parse(c)!);
-    cookies.forEach((c) => this.cookieJar.setCookieSync(c, this.baseUrl));
+  private async storeCookies(headers: Headers) {
+    const cookies = (headers.raw()['set-cookie'] || []).map((c) => Cookie.parse(c)!);
+    await Promise.all(cookies.map((c) => this.cookieJar.setCookie(c, this.baseUrl)));
   }
 
   public async verifyServer() {
     const { headers, body } = await this.request('/auth/verify.json');
-    this.storeCookies(headers);
+    await this.storeCookies(headers);
 
     const serverKey = body.body.keydata;
 
@@ -145,7 +145,7 @@ export class PassboltApi {
     const { headers: loginHeaders } = await this.request('/auth/login.json', 'POST', {
       gpg_auth: { keyid: this.userAuth.fingerprint, user_token_result: decrypted.data },
     });
-    this.storeCookies(loginHeaders);
+    await this.storeCookies(loginHeaders);
   }
 
   public async listResourceTypes(): Promise<ResourceType[]> {
