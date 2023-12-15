@@ -39,7 +39,7 @@ interface Permission {
   modified: Date;
 }
 
-interface Secret {
+export interface Secret {
   id: string;
   user_id: string;
   resource_id: string;

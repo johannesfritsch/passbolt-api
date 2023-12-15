@@ -3,7 +3,7 @@ import * as pgp from 'openpgp';
 import { Cookie, CookieJar } from 'tough-cookie';
 import { v4 as uuid } from 'uuid';
 import { Group } from './types/group';
-import { Resource } from './types/resource';
+import { Resource, Secret } from './types/resource';
 import { ResourceType } from './types/resource-type';
 import { User } from './types/user';
 
@@ -40,6 +40,16 @@ export class PassboltPassword implements PassboltResource {
   serialize() {
     return { name: this.name, username: this.username, description: this.description, uri: this.uri };
   }
+
+  static fromData(resource: Resource, data: string): PassboltPassword {
+    return new PassboltPassword(
+      resource.name,
+      data,
+      resource.username ?? undefined,
+      resource.description ?? undefined,
+      resource.uri ?? undefined,
+    );
+  }
 }
 
 export class PassboltSecureNote implements PassboltResource {
@@ -57,6 +67,11 @@ export class PassboltSecureNote implements PassboltResource {
 
   serialize() {
     return { name: this.name, username: this.username, uri: this.uri };
+  }
+
+  static fromData(resource: Resource, data: string): PassboltSecureNote {
+    const { password, description } = JSON.parse(data);
+    return new PassboltSecureNote(resource.name, description, password, resource.uri ?? undefined);
   }
 }
 
@@ -92,11 +107,12 @@ export class PassboltApi {
 
     const text = await response.text();
 
+    let error = text;
     try {
-      throw JSON.parse(text);
-    } catch (error) {
-      throw text;
-    }
+      error = JSON.parse(text);
+    } catch {}
+
+    throw error;
   }
 
   private async storeCookies(headers: Headers) {
@@ -218,5 +234,45 @@ export class PassboltApi {
         })),
       ),
     });
+  }
+
+  public async getDecryptedResource(resourceId: string): Promise<PassboltResource> {
+    const resource = await this.getResource(resourceId);
+    const secret = await this.getSecret(resourceId);
+    const decrypted = await this.decryptSecret(secret);
+
+    if (!this.resourceTypeIds) await this.fetchResourceTypeIds();
+
+    if (resource.resource_type_id === this.resourceTypeIds!.simplePassword)
+      return PassboltPassword.fromData(resource, decrypted);
+
+    if (resource.resource_type_id === this.resourceTypeIds!.withDescription)
+      return PassboltSecureNote.fromData(resource, decrypted);
+
+    throw new Error(`Unsupported resource type ${resource.resource_type_id}`);
+  }
+
+  public async getResource(resourceId: string): Promise<Resource> {
+    const { body } = await this.request(`/resources/${resourceId}.json`, 'GET');
+    return body.body;
+  }
+
+  public async getSecret(resourceId: string): Promise<Secret> {
+    const { body } = await this.request(`/secrets/resource/${resourceId}.json`, 'GET');
+    return body.body;
+  }
+
+  public async decryptSecret(secret: Secret): Promise<string> {
+    const privateKey = await pgp.decryptKey({
+      privateKey: await pgp.readPrivateKey({ armoredKey: this.userAuth.privateKeyArmored }),
+      passphrase: this.userAuth.privateKeyPassphrase,
+    });
+
+    const decrypted = await pgp.decrypt({
+      message: await pgp.readMessage({ armoredMessage: secret.data }),
+      decryptionKeys: privateKey,
+    });
+
+    return decrypted.data;
   }
 }
