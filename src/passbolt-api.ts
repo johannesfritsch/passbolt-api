@@ -80,7 +80,10 @@ export class PassboltApi {
   private resourceTypeIds: { simplePassword: string; withDescription: string } | undefined;
   private cookieJar = new CookieJar();
 
-  constructor(private baseUrl: string, private userAuth: UserAuth) {
+  constructor(
+    private baseUrl: string,
+    private userAuth: UserAuth,
+  ) {
     this.token = `gpgauthv1.3.0|36|${uuid()}|gpgauthv1.3.0`;
   }
 
@@ -273,6 +276,6 @@ export class PassboltApi {
       decryptionKeys: privateKey,
     });
 
-    return decrypted.data;
+    return decrypted.data.toString();
   }
 }
